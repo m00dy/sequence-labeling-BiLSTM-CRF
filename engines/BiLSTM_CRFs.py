@@ -7,7 +7,11 @@
 import math, os
 from engines.utils import metrics, save_csv_, extractEntity
 import numpy as np
-import tensorflow as tf
+import tensorflow as tf2
+import tensorflow.compat.v1 as tf
+tf.disable_v2_behavior()
+import tensorflow_addons as tfa
+
 import pandas as pd
 import time
 
@@ -87,7 +91,8 @@ class BiLSTM_CRFs(object):
         else:
             self.optimizer = tf.train.AdamOptimizer(self.learning_rate)
 
-        self.initializer = tf.contrib.layers.xavier_initializer()
+        #self.initializer = tf.contrib.layers.xavier_initializer()
+        self.initializer = tf2.initializers.GlorotUniform()
         self.global_step = tf.Variable(0, trainable=False, name="global_step", dtype=tf.int32)
 
         if configs.use_pretrained_embedding:
@@ -129,7 +134,7 @@ class BiLSTM_CRFs(object):
             self.length = tf.cast(self.length, tf.int32)
 
             # forward and backward
-            outputs, _, _ = tf.contrib.rnn.static_bidirectional_rnn(
+            outputs, _, _ = tf2.compat.v1.nn.static_bidirectional_rnn(
                 lstm_cell_fw,
                 lstm_cell_bw,
                 self.inputs_emb,
@@ -184,7 +189,7 @@ class BiLSTM_CRFs(object):
         self.logits = tf.matmul(self.outputs, self.softmax_w) + self.softmax_b
 
         self.logits = tf.reshape(self.logits, [self.batch_size, self.max_time_steps, self.num_classes])
-        # print(self.logits.get_shape().as_list())
+        print(self.logits.get_shape().as_list())
         if not self.is_crf:
             # softmax
             softmax_out = tf.nn.softmax(self.logits, axis=-1)
@@ -198,9 +203,18 @@ class BiLSTM_CRFs(object):
             self.loss = tf.reduce_mean(losses)
         else:
             # crf
-            self.log_likelihood, self.transition_params = tf.contrib.crf.crf_log_likelihood(
-                self.logits, self.targets, self.length)
-            self.batch_pred_sequence, self.batch_viterbi_score = tf.contrib.crf.crf_decode(self.logits,
+            #print(self.logits.shape[2])
+            #print(self.targets)
+            #print(self.length)
+
+            self.log_likelihood, self.transition_params = tfa.text.crf_log_likelihood(self.logits, self.targets, self.length)
+            #tf.contrib.crf.crf_log_likelihood(
+            #self.logits, self.targets, self.length)
+            #self.batch_pred_sequence, self.batch_viterbi_score = tf.contrib.crf.crf_decode(self.logits,
+            #                                                                               self.transition_params,
+            #                                                                               self.length)
+
+            self.batch_pred_sequence, self.batch_viterbi_score = tfa.text.crf_log_likelihood(self.logits,
                                                                                            self.transition_params,
                                                                                            self.length)
 
