@@ -11,6 +11,7 @@ import tensorflow as tf
 import pandas as pd
 import time
 
+tf.logging = tf.compat.v1.logging
 tf.logging.set_verbosity(tf.logging.ERROR)
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
@@ -51,7 +52,8 @@ class BiLSTM_CRFs(object):
 
         if configs.cell_type == 'LSTM':
             if self.biderectional:
-                self.cell = tf.nn.rnn_cell.LSTMCell(self.hidden_dim)
+                #self.cell = tf.nn.rnn_cell.LSTMCell(self.hidden_dim)
+                self.cell = tf.compat.v1.nn.rnn_cell.LSTMCell(self.hidden_dim)
             else:
                 self.cell = tf.nn.rnn_cell.LSTMCell(2 * self.hidden_dim)
         else:
@@ -85,16 +87,18 @@ class BiLSTM_CRFs(object):
         elif configs.optimizer == 'GD':
             self.optimizer = tf.train.GradientDescentOptimizer(self.learning_rate)
         else:
-            self.optimizer = tf.train.AdamOptimizer(self.learning_rate)
+            #self.optimizer = tf.train.AdamOptimizer(self.learning_rate)
+             self.optimizer = tf.optimizers.Adam
 
-        self.initializer = tf.contrib.layers.xavier_initializer()
+        #self.initializer = tf.contrib.layers.xavier_initializer()
+        self.initializer = tf.initializers.GlorotUniform()
         self.global_step = tf.Variable(0, trainable=False, name="global_step", dtype=tf.int32)
 
         if configs.use_pretrained_embedding:
             embedding_matrix = dataManager.getEmbedding(configs.token_emb_dir)
             self.embedding = tf.Variable(embedding_matrix, trainable=False, name="emb", dtype=tf.float32)
         else:
-            self.embedding = tf.get_variable("emb", [self.num_tokens, self.emb_dim], trainable=True,
+            self.embedding = tf.compat.v1.get_variable("emb", [self.num_tokens, self.emb_dim], trainable=True,
                                              initializer=self.initializer)
 
         self.build()
@@ -103,8 +107,8 @@ class BiLSTM_CRFs(object):
         self.sess = tf.Session(config=tf.ConfigProto(allow_soft_placement=True))
 
     def build(self):
-        self.inputs = tf.placeholder(tf.int32, [None, self.max_time_steps])
-        self.targets = tf.placeholder(tf.int32, [None, self.max_time_steps])
+        self.inputs = tf.compat.v1.placeholder(tf.int32, [None, self.max_time_steps])
+        self.targets = tf.compat.v1.placeholder(tf.int32, [None, self.max_time_steps])
 
         self.inputs_emb = tf.nn.embedding_lookup(self.embedding, self.inputs)
         self.inputs_emb = tf.transpose(self.inputs_emb, [1, 0, 2])
